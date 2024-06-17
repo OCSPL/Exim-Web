@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saved Queries</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            margin-top: 50px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+            <h1>Saved Queries</h1>
+            <div>
+                <a href="/index" class="btn btn-primary mr-2">Back to Search</a>
+                <a href="/logout" class="btn btn-danger">Logout</a>
+            </div>
+        </div>
+
+        <!-- Search Field -->
+        <div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+            <input type="text" id="search_query" class="form-control mr-2" placeholder="Search Query">
+            <button id="search_button" class="btn btn-primary">Search</button>
+            <button id="clear_filter_button" class="btn btn-secondary ml-2" style="display:none;">Clear Filter</button>
+        </div>
+        
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Query Name</th>
+                    <th>Search Type</th>
+                    <th>Conditions</th>
+                    <th>Date Start</th>
+                    <th>Date End</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for query in queries %}
+                <tr data-query-id="{{ query.id }}">
+                    <td>{{ query.name }}</td>
+                    <td>{{ query.search_type }}</td>
+                    <td>
+                        <ul>
+                            {% for condition in query.conditions %}
+                            <li>{{ condition.column }} {{ condition.condition }} {{ condition.value }}</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                    <td>{{ query.date_start }}</td>
+                    <td>{{ query.date_end }}</td>
+                    <td>
+                        <button class="btn btn-success run-query-button" data-query-id="{{ query.id }}">Run Query</button>
+                        <form action="{{ url_for('delete_saved_query', query_id=query.id) }}" method="post" style="display:inline;">
+                            {{ form.csrf_token }}
+                            <button type="submit" class="btn btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Display Results -->
+        <div id="query-results"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#search_button').click(function() {
+                var searchQuery = $('#search_query').val().toLowerCase();
+                $('tbody tr').each(function() {
+                    var queryName = $(this).find('td:first').text().toLowerCase();
+                    if (queryName.includes(searchQuery)) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+                $('#clear_filter_button').show(); // Show the clear filter button
+            });
+
+            $('#clear_filter_button').click(function() {
+                $('#search_query').val('');
+                $('tbody tr').show();
+                $(this).hide();
+                $('#query-results').empty(); // Clear the results
+            });
+
+            $('.run-query-button').click(function() {
+                var queryId = $(this).data('query-id');
+                $('tbody tr').hide(); // Hide all rows
+                $('tr[data-query-id="' + queryId + '"]').show(); // Show only the selected row
+                $('#clear_filter_button').show(); // Show the clear filter button
+
+                $.get('/run_saved_query/' + queryId, function(data) {
+                    $('#query-results').html(data);
+                });
+            });
+
+            $('#search_query').autocomplete({
+                source: function(request, response) {
+                    $.getJSON('/autocomplete', {
+                        term: request.term,
+                        search_type: 'import'  // or 'export' based on the current search type
+                    }, response);
+                },
+                minLength: 2
+            });
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!-- results.html -->
+{% if search_type == 'export' %}
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>SB_NO</th>
+            <th>SB_DATE</th>
+            <th>HS_CODE</th>
+            <th>PRODUCT</th>
+            <th>EXPORTER</th>
+            <th>CONSIGNEE</th>
+            <th>QTY</th>
+            <th>UNIT</th>
+            <th>RATE_IN_FC</th>
+            <th>CURRENCY</th>
+            <th>COUNTRY</th>
+            <th>LOAD_PORT</th>
+            <th>DESTI_PORT</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in results %}
+        <tr>
+            <td>{{ row.SB_NO }}</td>
+            <td>{{ row.SB_DATE }}</td>
+            <td>{{ row.HS_CODE }}</td>
+            <td>{{ row.PRODUCT }}</td>
+            <td>{{ row.EXPORTER }}</td>
+            <td>{{ row.CONSIGNEE }}</td>
+            <td>{{ row.QTY }}</td>
+            <td>{{ row.UNIT }}</td>
+            <td>{{ row.RATE_IN_FC }}</td>
+            <td>{{ row.CURRENCY }}</td>
+            <td>{{ row.COUNTRY }}</td>
+            <td>{{ row.LOAD_PORT }}</td>
+            <td>{{ row.DESTI_PORT }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>BE_NO</th>
+            <th>BE_DATE</th>
+            <th>HS_CODE</th>
+            <th>PRODUCT</th>
+            <th>IMPORTER</th>
+            <th>SUPPLIER</th>
+            <th>QTY</th>
+            <th>UNIT</th>
+            <th>RATE_IN_FC</th>
+            <th>CURRENCY</th>
+            <th>COUNTRY</th>
+            <th>LOAD_PORT</th>
+            <th>DESTI_PORT</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in results %}
+        <tr>
+            <td>{{ row.BE_NO }}</td>
+            <td>{{ row.BE_DATE }}</td>
+            <td>{{ row.HS_CODE }}</td>
+            <td>{{ row.PRODUCT }}</td>
+            <td>{{ row.IMPORTER }}</td>
+            <td>{{ row.SUPPLIER }}</td>
+            <td>{{ row.QTY }}</td>
+            <td>{{ row.UNIT }}</td>
+            <td>{{ row.RATE_IN_FC }}</td>
+            <td>{{ row.CURRENCY }}</td>
+            <td>{{ row.COUNTRY }}</td>
+            <td>{{ row.LOAD_PORT }}</td>
+            <td>{{ row.DESTI_PORT }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}

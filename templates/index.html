@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exim Data Portal</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/css/selectize.bootstrap3.min.css">
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/selectize.js/0.12.6/js/standalone/selectize.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+    <script src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+            <h1>Exim Data Portal</h1>
+            <a href="{{ url_for('change_password') }}" class="btn btn-warning">Change Password</a>
+            <a href="/logout" class="btn btn-danger">Logout</a>
+        </div>
+
+        <div class="d-flex justify-content-start mb-3">
+            <a href="/saved_queries" class="btn btn-info mr-2">View Saved Queries</a>
+            <a href="/global_queries" class="btn btn-info mr-2">View Global Queries</a>
+            {% if current_user.role == 'admin' %}
+            <a href="/approve_users" class="btn btn-info mr-2">Approve Users</a>
+            <a href="/upload" class="btn btn-info mr-2">Upload Data</a>
+            <a href="/manage_users" class="btn btn-info mr-2">Manage Users</a>
+            {% endif %}
+            <button type="button" class="btn btn-warning" id="clear_page_filters">Clear Page Filters</button>
+        </div>
+
+        <form method="post" id="query_form">
+            {{ form.hidden_tag() }}
+
+            <div class="form-row">
+                <div class="col-md-2">
+                    {{ form.search_type.label }}
+                    {{ form.search_type(class_="form-control", id="search_type") }}
+                </div>
+
+                <div class="col-md-3">
+                    {{ form.date_start.label }}
+                    {{ form.date_start(class_="form-control", id="date_start") }}
+                </div>
+
+                <div class="col-md-3">
+                    {{ form.date_end.label }}
+                    {{ form.date_end(class_="form-control", id="date_end", value=form.date_end.data) }}
+                </div>
+
+                <div class="col-md-3">
+                    <label for="saved_query_select">Saved Queries</label>
+                    <select id="saved_query_select" name="saved_query_select" class="form-control">
+                        <option value="">-- Select Saved Query --</option>
+                        {% for query in saved_queries %}
+                        <option value="{{ query.id }}">{{ query.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row mt-3">
+                <div class="col-md-3">
+                    <label for="global_query_select">Global Queries</label>
+                    <select id="global_query_select" name="global_query_select" class="form-control">
+                        <option value="">-- Select Global Query --</option>
+                        {% for query in global_queries %}
+                        <option value="{{ query.id }}">{{ query.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div id="conditions" class="mt-3">
+                {% for condition in form.conditions %}
+                <div class="form-row align-items-center mb-2 condition-row">
+                    <div class="col">
+                        {{ condition.column.label }}
+                        {{ condition.column(class_="form-control condition-column", id="conditions-{{ loop.index }}-column") }}
+                    </div>
+                    <div class="col">
+                        {{ condition.condition.label }}
+                        {{ condition.condition(class_="form-control", id="conditions-{{ loop.index }}-condition") }}
+                    </div>
+                    <div class="col">
+                        {{ condition.value.label }}
+                        {{ condition.value(class_="form-control condition-value", id="conditions-{{ loop.index }}-value") }}
+                    </div>
+                    <div class="col-auto">
+                        <button type="button" class="btn btn-danger delete-condition">Delete</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="form-group">
+                <button type="button" class="btn btn-secondary" id="add_condition">Add Condition</button>
+            </div>
+
+            <div class="form-group">
+                {{ form.submit(class_="btn btn-primary") }}
+            </div>
+
+            <div class="form-group">
+                <div class="form-row">
+                    <div class="col-md-4">
+                        {{ form.save_query.label }}
+                        {{ form.save_query(class_="form-control", id="save_query_name") }}
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        {{ form.save(class_="btn btn-success w-100", id="save_button") }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.global_query_name.label }}
+                        {{ form.global_query_name(class_="form-control", id="global_query_name") }}
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        {{ form.save_global(class_="btn btn-success w-100", id="save_global_button") }}
+                    </div>
+                </div>
+            </div>
+
+            {{ form.loaded_query_id }} <!-- Add this line -->
+        </form>
+
+        <div>
+            {% if export_graph %}
+            {{ export_graph|safe }}
+            {% endif %}
+            {% if import_graph %}
+            {{ import_graph|safe }}
+            {% endif %}
+        </div>
+        {% if results %}
+        <h2>Search Results</h2>
+        <div class="d-flex justify-content-between mb-2">
+            <button type="button" class="btn btn-warning" id="clear_table_filters_top">Clear Table Filters</button>
+            {% if current_user.role == 'admin' %}
+            <form method="post" action="{{ url_for('download_results', search_type=form.search_type.data) }}">
+                {{ form.hidden_tag() }}
+                <button type="submit" class="btn btn-primary">Download Results as CSV</button>
+                <input type="hidden" name="results_data" value="{{ results_data }}">
+            </form>
+            {% endif %}
+        </div>
+        <table id="results-table" class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>SB/BE NO</th>
+                    <th>Date</th>
+                    <th>HS Code</th>
+                    <th>Product</th>
+                    <th>Exporter/Importer</th>
+                    <th>Consignee/Supplier</th>
+                    <th>Quantity</th>
+                    <th>Unit</th>
+                    <th>Rate</th>
+                    <th>Currency</th>
+                    <th>Country</th>
+                    <th>Load Port</th>
+                    <th>Destination Port</th>
+                </tr>
+                <tr>
+                    <th>
+                        <select class="form-control filter-select" id="filter-sb_no"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-date"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-hs_code"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-product"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-exporter"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-consignee"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-quantity"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-unit"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-rate"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-currency"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-country"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-load_port"></select>
+                    </th>
+                    <th>
+                        <select class="form-control filter-select" id="filter-destination_port"></select>
+                    </th>
+                </tr>
+            </thead>
+            <tbody id="results-table-body">
+                {% for row in results.exports %}
+                <tr>
+                    <td>{{ row.SB_NO }}</td>
+                    <td>{{ row.SB_DATE }}</td>
+                    <td>{{ row.HS_CODE }}</td>
+                    <td>{{ row.PRODUCT }}</td>
+                    <td>{{ row.EXPORTER }}</td>
+                    <td>{{ row.CONSIGNEE }}</td>
+                    <td>{{ row.QTY }}</td>
+                    <td>{{ row.UNIT }}</td>
+                    <td>{{ row.RATE_IN_FC }}</td>
+                    <td>{{ row.CURRENCY }}</td>
+                    <td>{{ row.COUNTRY }}</td>
+                    <td>{{ row.LOAD_PORT }}</td>
+                    <td>{{ row.DESTI_PORT }}</td>
+                </tr>
+                {% endfor %}
+                {% for row in results.imports %}
+                <tr>
+                    <td>{{ row.BE_NO }}</td>
+                    <td>{{ row.BE_DATE }}</td>
+                    <td>{{ row.HS_CODE }}</td>
+                    <td>{{ row.PRODUCT }}</td>
+                    <td>{{ row.IMPORTER }}</td>
+                    <td>{{ row.SUPPLIER }}</td>
+                    <td>{{ row.QTY }}</td>
+                    <td>{{ row.UNIT }}</td>
+                    <td>{{ row.RATE_IN_FC }}</td>
+                    <td>{{ row.CURRENCY }}</td>
+                    <td>{{ row.COUNTRY }}</td>
+                    <td>{{ row.LOAD_PORT }}</td>
+                    <td>{{ row.DESTI_PORT }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="d-flex justify-content-between mb-2">
+            <button type="button" class="btn btn-warning" id="clear_table_filters_bottom">Clear Table Filters</button>
+            {% if current_user.role == 'admin' %}
+            <form method="post" action="{{ url_for('download_results', search_type=form.search_type.data) }}">
+                {{ form.hidden_tag() }}
+                <button type="submit" class="btn btn-primary">Download Results as CSV</button>
+                <input type="hidden" name="results_data" value="{{ results_data }}">
+            </form>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Add your JavaScript here -->
+    <script>
+        $(document).ready(function() {
+            var conditionIndex = {{ form.conditions|length }};
+
+            $('#saved_query_select').selectize({
+                sortField: 'text',
+                searchField: 'text',
+                valueField: 'value',
+                labelField: 'text',
+                create: false,
+                placeholder: '-- Select Saved Query --'
+            });
+
+            $('#global_query_select').selectize({
+                sortField: 'text',
+                searchField: 'text',
+                valueField: 'value',
+                labelField: 'text',
+                create: false,
+                placeholder: '-- Select Global Query --'
+            });
+
+            function populateColumns(searchType) {
+                $.get('/get_columns/' + searchType, function(data) {
+                    $('.condition-column').each(function() {
+                        var select = $(this);
+                        var currentVal = select.val(); // Save the current value
+                        select.empty();
+                        data.forEach(function(column) {
+                            select.append('<option value="' + column + '">' + column + '</option>');
+                        });
+                        select.val(currentVal); // Restore the value
+                    });
+                });
+            }
+
+            function setupAutocomplete() {
+                $('.condition-value').each(function() {
+                    var columnField = $(this).closest('.condition-row').find('.condition-column');
+                    var column = columnField.val();
+                    var searchType = $('#search_type').val();
+                    $(this).autocomplete({
+                        source: function(request, response) {
+                            $.getJSON('/autocomplete', {
+                                term: request.term,
+                                column: column,
+                                search_type: searchType
+                            }, response);
+                        },
+                        minLength: 2
+                    });
+                });
+            }
+
+            function populateFilters() {
+                var columns = ['sb_no', 'date', 'hs_code', 'product', 'exporter', 'consignee', 'quantity', 'unit', 'rate', 'currency', 'country', 'load_port', 'destination_port'];
+                columns.forEach(function(column) {
+                    var select = $('#filter-' + column);
+                    var values = [];
+                    $('#results-table-body tr').each(function() {
+                        var cell = $(this).find('td').eq(columns.indexOf(column));
+                        if (cell.length && !values.includes(cell.text().trim())) {
+                            values.push(cell.text().trim());
+                        }
+                    });
+                    values.sort();
+                    select.append('<option value="">-- Select --</option>');
+                    values.forEach(function(value) {
+                        select.append('<option value="' + value + '">' + value + '</option>');
+                    });
+                });
+            }
+
+            function filterTable() {
+                var filters = {};
+                $('.filter-select').each(function() {
+                    var column = $(this).attr('id').replace('filter-', '');
+                    filters[column] = $(this).val().toLowerCase();
+                });
+
+                $('#results-table-body tr').each(function() {
+                    var match = true;
+                    $(this).find('td').each(function(index) {
+                        var column = Object.keys(filters)[index];
+                        if (filters[column] && !$(this).text().toLowerCase().includes(filters[column])) {
+                            match = false;
+                        }
+                    });
+                    $(this).toggle(match);
+                });
+            }
+
+            function clearTableFilters() {
+                $('.filter-select').val('');
+                $('#results-table-body tr').show();
+            }
+
+            function clearPageFilters() {
+                window.location.href = '/clear_filters';
+            }
+
+            function addCondition() {
+                var conditionHtml = `
+                    <div class="form-row align-items-center mb-2 condition-row">
+                        <div class="col">
+                            <label for="conditions-${conditionIndex}-column">Column</label>
+                            <select name="conditions-${conditionIndex}-column" class="form-control condition-column" id="conditions-${conditionIndex}-column">
+                                <!-- Options will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label for="conditions-${conditionIndex}-condition">Condition</label>
+                            <select name="conditions-${conditionIndex}-condition" class="form-control" id="conditions-${conditionIndex}-condition">
+                                <option value="contains">Contains</option>
+                                <option value="not_contains">Does Not Contain</option>
+                                <option value="equals">Equals</option>
+                                <option value="not_equals">Not Equals</option>
+                                <option value="greater_than">Greater Than</option>
+                                <option value="less_than">Less Than</option>
+                                <option value="greater_than_equal">Greater Than or Equal</option>
+                                <option value="less_than_equal">Less Than or Equal</option>
+                            </select>
+                        </div>
+                        <div class="col">
+                            <label for="conditions-${conditionIndex}-value">Value</label>
+                            <input name="conditions-${conditionIndex}-value" class="form-control condition-value" id="conditions-${conditionIndex}-value">
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-danger delete-condition">Delete</button>
+                        </div>
+                    </div>`;
+                $('#conditions').append(conditionHtml);
+                populateColumns($('#search_type').val());
+                setupAutocomplete();
+                conditionIndex++;
+            }
+
+            $('#add_condition').click(addCondition);
+
+            $(document).on('click', '.delete-condition', function() {
+                $(this).closest('.condition-row').remove();
+            });
+
+            $('#saved_query_select').change(function() {
+                var queryId = $(this).val();
+                if (queryId) {
+                    $.get('/load_saved_query/' + queryId, function(data) {
+                        $('#search_type').val(data.search_type).trigger('change');
+                        $('#date_start').val(data.date_start);
+                        $('#date_end').val(new Date().toISOString().split('T')[0]); // Set end date to current date
+                        $('#loaded_query_id').val(queryId); // Set the hidden field
+                        $('#save_query_name').val(data.name); // Set the query name
+
+                        $('#conditions').empty(); // Clear existing conditions
+                        data.conditions.forEach(function(condition, index) {
+                            var conditionHtml = `
+                                <div class="form-row align-items-center mb-2 condition-row">
+                                    <div class="col">
+                                        <label for="conditions-${index}-column">Column</label>
+                                        <select name="conditions-${index}-column" class="form-control condition-column" id="conditions-${index}-column">
+                                            <option value="${condition.column}">${condition.column}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col">
+                                        <label for="conditions-${index}-condition">Condition</label>
+                                        <select name="conditions-${index}-condition" class="form-control" id="conditions-${index}-condition">
+                                            <option value="${condition.condition}">${condition.condition}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col">
+                                        <label for="conditions-${index}-value">Value</label>
+                                        <input name="conditions-${index}-value" class="form-control condition-value" id="conditions-${index}-value" value="${condition.value}">
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-danger delete-condition">Delete</button>
+                                    </div>
+                                </div>`;
+                            $('#conditions').append(conditionHtml);
+                        });
+
+                        setupAutocomplete();
+
+                        $('.delete-condition').click(function() {
+                            $(this).closest('.condition-row').remove();
+                        });
+                    });
+                }
+            });
+
+            $('#global_query_select').change(function() {
+                var queryId = $(this).val();
+                if (queryId) {
+                    $.get('/load_global_query/' + queryId, function(data) {
+                        $('#search_type').val(data.search_type).trigger('change');
+                        $('#date_start').val(data.date_start);
+                        $('#date_end').val(new Date().toISOString().split('T')[0]); // Set end date to current date
+                        $('#loaded_query_id').val(queryId); // Set the hidden field
+                        $('#save_query_name').val(data.name); // Set the query name
+
+                        $('#conditions').empty(); // Clear existing conditions
+                        data.conditions.forEach(function(condition, index) {
+                            var conditionHtml = `
+                                <div class="form-row align-items-center mb-2 condition-row">
+                                    <div class="col">
+                                        <label for="conditions-${index}-column">Column</label>
+                                        <select name="conditions-${index}-column" class="form-control condition-column" id="conditions-${index}-column">
+                                            <option value="${condition.column}">${condition.column}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col">
+                                        <label for="conditions-${index}-condition">Condition</label>
+                                        <select name="conditions-${index}-condition" class="form-control" id="conditions-${index}-condition">
+                                            <option value="${condition.condition}">${condition.condition}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col">
+                                        <label for="conditions-${index}-value">Value</label>
+                                        <input name="conditions-${index}-value" class="form-control condition-value" id="conditions-${index}-value" value="${condition.value}">
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="button" class="btn btn-danger delete-condition">Delete</button>
+                                    </div>
+                                </div>`;
+                            $('#conditions').append(conditionHtml);
+                        });
+
+                        setupAutocomplete();
+
+                        $('.delete-condition').click(function() {
+                            $(this).closest('.condition-row').remove();
+                        });
+                    });
+                }
+            });
+
+            // Add client-side validation for save query name
+            $('#save_button, #save_global_button').click(function(e) {
+                if ($('#save_query_name').val().trim() === '') {
+                    alert('Save Query As field cannot be empty.');
+                    e.preventDefault(); // Prevent form submission
+                }
+            });
+
+            $('.filter-select').change(filterTable);
+            $('#clear_table_filters_top, #clear_table_filters_bottom').click(clearTableFilters);
+            $('#clear_page_filters').click(clearPageFilters);
+
+            setupAutocomplete();
+            populateFilters();
+
+            $('#results-table').DataTable(); // Initialize DataTable for sorting
+        });
+    </script>
+</body>
+
+</html>

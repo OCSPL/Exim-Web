@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Profile</title>
+</head>
+<body>
+    <form method="POST" action="{{ url_for('profile') }}">
+        {{ form.hidden_tag() }}
+        <div>
+            {{ form.first_name.label }} {{ form.first_name }}
+        </div>
+        <div>
+            {{ form.last_name.label }} {{ form.last_name }}
+        </div>
+        <div>
+            {{ form.bio.label }} {{ form.bio }}
+        </div>
+        <div>
+            {{ form.submit }}
+        </div>
+    </form>
+</body>
+</html>
